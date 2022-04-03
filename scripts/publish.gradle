@@ -2,7 +2,7 @@ apply plugin: 'maven-publish'
 
 def LIB_GROUP_ID = 'in.mohalla'
 def LIB_ARTIFACT_ID = 'ads'
-def LIB_VERSION = '0.0.2'
+def LIB_VERSION = '0.0.1'
 
 task sourceJar(type: Jar) {
     from android.sourceSets.main.java.srcDirs
