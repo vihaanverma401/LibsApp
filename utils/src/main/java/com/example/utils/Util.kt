@@ -9,4 +9,8 @@ object Util {
     fun getData1(): Int {
         return 1
     }
+
+    fun getData2(): Int {
+        return 1
+    }
 }
