@@ -2,7 +2,7 @@ apply plugin: 'maven-publish'
 
 def LIB_GROUP_ID = 'in.mohalla'
 def LIB_ARTIFACT_ID = 'ads'
-def LIB_VERSION = '0.0.5'
+def LIB_VERSION = '0.0.6'
 
 task sourceJar(type: Jar) {
     from android.sourceSets.main.java.srcDirs
@@ -50,7 +50,7 @@ publishing{
         utilsLib(MavenPublication) {
             groupId LIB_GROUP_ID
             artifactId "utils"
-            version "0.0.3"
+            version "0.1.0"
             artifact("$buildDir/outputs/aar/utils-release.aar")
             artifact(sourceJar)
 
