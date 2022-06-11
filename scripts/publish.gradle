@@ -1,71 +1,82 @@
+/**
+ * Script use for generating and publishing artifacts for github packages
+ * Using command: ./gradlew publishAarPublicationToShareChatPackagesRepository -PuseAARForDevBuild=false
+ */
+
+apply from: "$rootDir/scripts/local-aar-config.gradle"
 apply plugin: 'maven-publish'
 
-def LIB_GROUP_ID = 'in.mohalla'
-def LIB_ARTIFACT_ID = 'ads'
-def LIB_VERSION = '0.0.6'
-
-task sourceJar(type: Jar) {
-    from android.sourceSets.main.java.srcDirs
-    classifier "sources"
+static def getArtifactId(projectPath) {
+    def artifactId = projectPath.substring(1).replaceAll(":", '-').replaceAll("@", "")
+    return artifactId
 }
 
+static def getModuleName(artifactId) {
+    def moduleName = artifactId.replaceAll("(repository|manager|libraries|feature)(-)((\\w+-|(\\w+))+)", "\$1:\$3")
+    return moduleName
+}
 
-publishing{
-    repositories {
-        maven {
-            name = "GithubPackages"
-            url = uri("https://maven.pkg.github.com/vihaanverma401/LibsApp")
-            credentials {
-                username = System.getenv('GITHUB_USER') ?: project.properties['GITHUB_USER']
-                password = System.getenv('GITHUB_PERSONAL_ACCESS_TOKEN') ?: project.properties['GITHUB_PERSONAL_ACCESS_TOKEN']
-            }
+static def getModuleNameFromDependency(group, name, rootProjectName) {
+    def finalModuleName = group.replaceAll("$rootProjectName.", "")
+    if (finalModuleName.isBlank() || group == rootProjectName) {
+        finalModuleName = name
+    } else {
+        if (finalModuleName.contains(".")) {
+            finalModuleName = finalModuleName.replaceAll("[.]", "-")
         }
-        maven {
-            name = 'CustomMavenRepo'
-            url = "file://${buildDir}/repo"
+        finalModuleName = "$finalModuleName-$name"
+    }
+    return finalModuleName.replaceAll("@", "")
+}
+
+publishing {
+    publications {
+        aar(MavenPublication) {
+            project.tasks.publishAarPublicationToMavenLocal.dependsOn("assembleRelease")
+            groupId localAARPublishConfig.groupId
+            artifactId getArtifactId(project.path)
+            version localAARPublishConfig.version
+            artifact("$buildDir/outputs/aar/${project.getName()}-release.aar")
+
+            pom.withXml {
+                def dependencies = asNode().appendNode('dependencies')
+                configurations.implementation.allDependencies.each { addDependencyNode(dependencies,it) }
+                configurations.api.allDependencies.each { addDependencyNode(dependencies,it) }
+            }
         }
     }
 
-    publications {
-//        adsLib(MavenPublication) {
-//            groupId LIB_GROUP_ID
-//            artifactId LIB_ARTIFACT_ID
-//            version LIB_VERSION
-//            artifact("$buildDir/outputs/aar/adsSdk-release.aar")
-//            artifact(sourceJar)
-//
-//            pom.withXml {
-//                def dependenciesNode = asNode().appendNode('dependencies')
-//
-//                //Iterate over the compile dependencies (we don't want the test ones), adding a <dependency> node for each
-//                configurations.api.allDependencies.each {
-//                    def dependencyNode = dependenciesNode.appendNode('dependency')
-//                    dependencyNode.appendNode('groupId', it.group)
-//                    dependencyNode.appendNode('artifactId', it.name)
-//                    dependencyNode.appendNode('version', it.version)
-//                }
-//            }
-//        }
-
-        utilsLib(MavenPublication) {
-            groupId LIB_GROUP_ID
-            artifactId "utils"
-            version "0.1.0"
-            artifact("$buildDir/outputs/aar/utils-release.aar")
-            artifact(sourceJar)
-
-            pom.withXml {
-                def dependenciesNode = asNode().appendNode('dependencies')
-
-                //Iterate over the compile dependencies (we don't want the test ones), adding a <dependency> node for each
-                configurations.api.allDependencies.each {
-                    def dependencyNode = dependenciesNode.appendNode('dependency')
-                    dependencyNode.appendNode('groupId', it.group)
-                    dependencyNode.appendNode('artifactId', it.name)
-                    dependencyNode.appendNode('version', it.version)
-                }
+    repositories {
+        maven {
+            name = "ShareChatPackages"
+            url = uri("https://maven.pkg.github.com/ShareChat/sharechat-android")
+            credentials {
+                username = System.getenv("GITHUB_USERNAME") ?: ""
+                password = System.getenv("GITHUB_PACKAGE_KEY") ?: ""
             }
         }
+        maven {
+            url = "$rootDir/localMavenRepository"
+        }
+        project.tasks.publishAarPublicationToMavenRepository.dependsOn("assembleRelease")
+        project.tasks.publishAarPublicationToShareChatPackagesRepository.dependsOn("assembleRelease")
+    }
+}
 
+private void addDependencyNode(Node dependencies,Dependency it) {
+    if (it.group == null || it.group == localAARPublishConfig.groupId) {
+        println("ignoring dependency ${it.group}:${it.name}:${it.version}")
+        return
+    }
+
+    def dependency = dependencies.appendNode('dependency')
+    if (it.group.startsWith(rootProject.name)) {
+        dependency.appendNode('groupId', localAARPublishConfig.groupId)
+        dependency.appendNode('version', localAARPublishConfig.version)
+        dependency.appendNode('artifactId', getModuleNameFromDependency(it.group, it.name, rootProject.name))
+    } else {
+        dependency.appendNode('groupId', it.group)
+        dependency.appendNode('version', it.version)
+        dependency.appendNode('artifactId', it.name)
     }
 }

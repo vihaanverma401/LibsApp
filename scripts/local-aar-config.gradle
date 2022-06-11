@@ -1,0 +1,26 @@
+/*
+Publish all modules to local maven repository
+./gradlew publishAarPublicationToMavenRepository -PuseAARForDevBuild=false
+
+Publish only dev modules to local maven repository
+./gradlew publishAarPublicationToMavenRepository -PuseAARForDevBuild=true
+*/
+// Load publish.properties
+def publishPropertiesFile = file("${rootDir}/scripts/publish.properties")
+if (!publishPropertiesFile.exists()) publishPropertiesFile.createNewFile()
+def publishProps = new Properties()
+publishPropertiesFile.withInputStream { publishProps.load(it) }
+
+// Load local.properties if it is found
+def propFile = file("${rootDir}/local.properties")
+if (!propFile.exists()) propFile.createNewFile()
+def props = new Properties()
+propFile.withInputStream { props.load(it) }
+
+//Give preference to command line params over local.properties
+ext.useAARForDevBuild = (hasProperty("useAARForDevBuild")) ? getProperty("useAARForDevBuild").toBoolean() : props.getProperty("useAARForDevBuild", "false").toBoolean()
+ext.inDevModules = (hasProperty("modules")) ? getProperty("modules").split(" ") : props.getProperty('modules', "").split(" ")
+ext.localAARPublishConfig = [
+        groupId: (hasProperty("groupId")) ? getProperty("groupId").toString() : publishProps.getProperty("groupId", "sharechat.module").toString(),
+        version: (hasProperty("publishVersion")) ? getProperty("publishVersion").toString() : publishProps.getProperty("publishVersion", "0.0.1").toString(),
+]

@@ -1,0 +1,36 @@
+apply from: "$rootDir/scripts/local-aar-config.gradle"
+
+static def getArtifactId(projectPath) {
+    def artifactId = projectPath.substring(1).replaceAll(":", '-').replaceAll("@", "")
+    return artifactId
+}
+
+ext.customModulePath = { moduleName ->
+    if (useAARForDevBuild && !inDevModules.contains("$moduleName")) {
+        def artifactId = getArtifactId(moduleName)
+        return "${localAARPublishConfig.groupId}:$artifactId:${localAARPublishConfig.version}"
+    } else {
+        return project("$moduleName")
+    }
+}
+
+ext.customLibraryPath = { moduleName ->
+    def isCiServer = "CI" in System.getenv()
+    if (isCiServer) {
+        def artifactId = getArtifactId(moduleName)
+        return "${localAARPublishConfig.groupId}:$artifactId:${localAARPublishConfig.version}"
+    } else {
+        return customModulePath(moduleName)
+    }
+}
+
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        if (useAARForDevBuild) {
+            inDevModules.each { moduleName ->
+                def artifactId = getArtifactId(moduleName)
+                substitute module("${localAARPublishConfig.groupId}:$artifactId:${localAARPublishConfig.version}") with project(moduleName)
+            }
+        }
+    }
+}
